@@ -15,6 +15,18 @@ class TLUNREAL_API ASCharacter : public ACharacter
 	GENERATED_BODY()
 
 public:
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<AActor> MainAttackProjectile;
+
+	UPROPERTY(EditAnywhere)
+	float ProjectileXDeviation{ 0.0f };
+
+	UPROPERTY(EditAnywhere)
+	float MaxPitchRotationLower{ 10.0f };
+
+	UPROPERTY(EditAnywhere)
+	float MaxPitchRotationUpper{ 330.0f };
+
 	// Sets default values for this character's properties
 	ASCharacter();
 
@@ -36,4 +48,6 @@ protected:
 	
 	void MoveForward(float value);
 	void StrafeRight(float value);
+	void LookUp(float value);
+	void PrimaryAttack();
 };
