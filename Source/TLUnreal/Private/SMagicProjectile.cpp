@@ -5,6 +5,7 @@
 #include "Components/SphereComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Particles/ParticleSystemComponent.h"
+#include "Kismet/GameplayStatics.h"
 
 // Sets default values
 ASMagicProjectile::ASMagicProjectile()
@@ -29,12 +30,39 @@ ASMagicProjectile::ASMagicProjectile()
 void ASMagicProjectile::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
+	SphereComp->OnComponentHit.AddDynamic(this, &ASMagicProjectile::OnHit);
+	if (LifeDuration != 0)
+	{
+		GetWorldTimerManager().SetTimer(TimerHandle_Destroy, this, &ASMagicProjectile::EndLifetime, LifeDuration);
+	}
+
+	if (ActivationDuration != 0)
+	{
+		GetWorldTimerManager().SetTimer(TimerHandle_Activate, this, &ASMagicProjectile::Activate, ActivationDuration);
+	}
 }
 
-// Called every frame
-void ASMagicProjectile::Tick(float DeltaTime)
+void ASMagicProjectile::OnHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
 {
-	Super::Tick(DeltaTime);
+	OnHitInternal();
+}
+
+void ASMagicProjectile::OnHitInternal()
+{
+	if (ExplosionEffect)
+	{
+		UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ExplosionEffect, GetActorLocation(), GetActorRotation());
+	}
+
+	if (bDestroyOnHit)
+	{
+		EndLifetime();
+	}
+}
+
+void ASMagicProjectile::EndLifetime()
+{
+	Destroy(true);
 }
 

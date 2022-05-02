@@ -11,6 +11,7 @@ ASBarell::ASBarell()
 	PrimaryActorTick.bCanEverTick = true;
 
 	StaticMeshComp = CreateDefaultSubobject<UStaticMeshComponent>("MeshComponent");
+	StaticMeshComp->SetSimulatePhysics(true);
 	RootComponent = StaticMeshComp;
 
 	RadialForceComp = CreateDefaultSubobject<URadialForceComponent>("RadialForceComponent");
@@ -32,8 +33,12 @@ void ASBarell::Tick(float DeltaTime)
 
 void ASBarell::OnHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
 {
-	if (ASMagicProjectile* Projectile = Cast<ASMagicProjectile>(OtherActor))
+	if (bCanExplode)
 	{
-		RadialForceComp->FireImpulse();
-	}	
+		if (ASMagicProjectile* Projectile = Cast<ASMagicProjectile>(OtherActor))
+		{
+			RadialForceComp->FireImpulse();
+			bCanExplode = false;
+		}
+	}
 }

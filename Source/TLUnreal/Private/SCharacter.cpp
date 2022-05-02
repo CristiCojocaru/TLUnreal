@@ -4,7 +4,10 @@
 #include "SCharacter.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
+#include "SInteractionComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Kismet/KismetMathLibrary.h"
+#include "DrawDebugHelpers.h"
 
 // Sets default values
 ASCharacter::ASCharacter()
@@ -19,15 +22,10 @@ ASCharacter::ASCharacter()
 	CameraComp = CreateDefaultSubobject<UCameraComponent>("CameraComponent");
 	CameraComp->SetupAttachment(SpringArmComp);
 
+	InteractionComp = CreateDefaultSubobject<USInteractionComponent>("InteractionComponent");
+
 	bUseControllerRotationYaw = false;
 	GetCharacterMovement()->bOrientRotationToMovement = true;
-}
-
-// Called when the game starts or when spawned
-void ASCharacter::BeginPlay()
-{
-	Super::BeginPlay();
-	
 }
 
 // Called every frame
@@ -41,14 +39,21 @@ void ASCharacter::Tick(float DeltaTime)
 void ASCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
+	SpringArmComp->SocketOffset = BaseOffset;
 
 	PlayerInputComponent->BindAxis("MoveForward", this, &ASCharacter::MoveForward);
 	PlayerInputComponent->BindAxis("StrafeRight", this, &ASCharacter::StrafeRight);
 	PlayerInputComponent->BindAxis("LookUp", this, &ASCharacter::LookUp);
 	PlayerInputComponent->BindAxis("Turn", this, &APawn::AddControllerYawInput);
+	
+	PlayerInputComponent->BindAction("Use", IE_Pressed, this, &ASCharacter::PrimaryInteract);
+	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &ACharacter::Jump);
+
+	PlayerInputComponent->BindAction("Aim", IE_Pressed, this, &ASCharacter::StartAiming);
+	PlayerInputComponent->BindAction("Aim", IE_Released, this, &ASCharacter::StopAiming);
 
 	PlayerInputComponent->BindAction("PrimaryAttack", IE_Pressed, this, &ASCharacter::PrimaryAttack);
-	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &ACharacter::Jump);
+	PlayerInputComponent->BindAction("NextAttack", IE_Pressed, this, &ASCharacter::NextAttack);
 }
 
 void ASCharacter::MoveForward(float value)
@@ -86,17 +91,75 @@ void ASCharacter::LookUp(float value)
 
 void ASCharacter::PrimaryAttack()
 {
-	//FRotator CameraRotation = GetControlRotation();
-	//CameraRotation.Pitch = 0;
-	//CameraRotation.Roll = 0;
-	//SetActorRotation(CameraRotation);
+	FRotator CameraRotation = GetControlRotation();
+	CameraRotation.Pitch = 0;
+	CameraRotation.Roll = 0;
+	SetActorRotation(CameraRotation);
 
-	FVector HandLocation = GetMesh()->GetSocketLocation("Muzzle_01");
-	HandLocation += GetActorForwardVector() * ProjectileXDeviation;
-	FTransform SpawnTM(GetActorRotation(), HandLocation);
+	PlayAnimMontage(AttackAnim);
 
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	GetWorldTimerManager().SetTimer(TimerHandle_PrimaryAttack, this, &ASCharacter::SpawnProjectile, ProjectileSpawnDelay);
+}
 
-	GetWorld()->SpawnActor<AActor>(MainAttackProjectile, SpawnTM, SpawnParams);
+void ASCharacter::SpawnProjectile()
+{
+	if (AttackList.Num() > AttackIndex)
+	{
+		FVector HandLocation = GetMesh()->GetSocketLocation("Muzzle_01");
+		HandLocation += GetActorForwardVector() * ProjectileXDeviation;
+
+		FCollisionObjectQueryParams ObjectQuery;
+		ObjectQuery.AddObjectTypesToQuery(ECC_WorldStatic);
+
+		APlayerCameraManager* PlayerCamera = GetWorld()->GetFirstPlayerController()->PlayerCameraManager;
+		FRotator CameraRotation = GetControlRotation();
+		FVector MaxAimRangeLocation = PlayerCamera->GetCameraLocation() + (CameraRotation.Vector() * AimRangeFactor);
+
+		FHitResult Hit;
+		FRotator ProjectileSpawnRotation;
+		if (GetWorld()->LineTraceSingleByObjectType(Hit, PlayerCamera->GetCameraLocation(), MaxAimRangeLocation, ObjectQuery))
+		{
+			//DrawDebugLine(GetWorld(), HandLocation, Hit.Location, FColor::Blue, false, 2.0f, 0, 2.0f);
+			ProjectileSpawnRotation = UKismetMathLibrary::MakeRotFromX(Hit.Location - HandLocation);
+		}
+		else
+		{
+			//DrawDebugLine(GetWorld(), HandLocation, PlayerCamera->GetCameraLocation() + CameraRotation.Vector() * AimRangeFactor, FColor::Blue, false, 2.0f, 0, 2.0f);
+			ProjectileSpawnRotation = UKismetMathLibrary::MakeRotFromX(MaxAimRangeLocation - HandLocation);
+		}
+		FTransform SpawnTM(ProjectileSpawnRotation, HandLocation);
+
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		
+		AActor* Projectile = GetWorld()->SpawnActor<AActor>(AttackList[AttackIndex], SpawnTM, SpawnParams);
+		Projectile->SetOwner(this);
+	}
+}
+
+void ASCharacter::NextAttack()
+{
+	AttackIndex++;
+	if (AttackIndex >= AttackList.Num())
+	{
+		AttackIndex = 0;
+	}
+}
+
+void ASCharacter::PrimaryInteract()
+{
+	if (InteractionComp)
+	{
+		InteractionComp->PrimaryInteract();
+	}
+}
+
+void ASCharacter::StartAiming()
+{
+	SpringArmComp->SocketOffset = AimingOffset;
+}
+
+void ASCharacter::StopAiming()
+{
+	SpringArmComp->SocketOffset = BaseOffset;
 }

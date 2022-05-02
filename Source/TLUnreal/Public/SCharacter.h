@@ -8,6 +8,7 @@
 
 class UCameraComponent;
 class USpringArmComponent;
+class USInteractionComponent;
 
 UCLASS()
 class TLUNREAL_API ASCharacter : public ACharacter
@@ -15,17 +16,30 @@ class TLUNREAL_API ASCharacter : public ACharacter
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(EditAnywhere)
-	TSubclassOf<AActor> MainAttackProjectile;
+	UPROPERTY(EditAnywhere, Category = "Attack")
+	TArray<TSubclassOf<AActor>> AttackList;
 
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, Category="Attack")
+	UAnimMontage* AttackAnim;
+
+	UPROPERTY(EditAnywhere, Category = "Attack")
 	float ProjectileXDeviation{ 0.0f };
 
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, Category = "Attack")
+	float ProjectileSpawnDelay{ 0.2f };
+
+	FTimerHandle TimerHandle_PrimaryAttack;
+	unsigned short AttackIndex{ 0 };
+
+
+	UPROPERTY(EditAnywhere, Category = "Camera")
 	float MaxPitchRotationLower{ 10.0f };
 
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, Category = "Camera")
 	float MaxPitchRotationUpper{ 330.0f };
+
+	UPROPERTY(EditAnywhere, Category = "Camera")
+	float AimRangeFactor {5000.0f};
 
 	// Sets default values for this character's properties
 	ASCharacter();
@@ -43,11 +57,24 @@ protected:
 	UPROPERTY(VisibleAnywhere)
 	UCameraComponent* CameraComp;
 
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
-	
+	UPROPERTY(VisibleAnywhere)
+	USInteractionComponent* InteractionComp;
+
 	void MoveForward(float value);
 	void StrafeRight(float value);
 	void LookUp(float value);
+	void PrimaryInteract();
+
 	void PrimaryAttack();
+	void NextAttack();
+
+	void SpawnProjectile();
+	void StartAiming();
+	void StopAiming();
+
+	UPROPERTY(EditAnywhere, Category = "Aiming")
+	FVector BaseOffset{ 0.0f, 0.0f, 90.0f };
+
+	UPROPERTY(EditAnywhere, Category = "Aiming")
+	FVector AimingOffset{ 100.0f, 90.0f, 90.0f };
 };
