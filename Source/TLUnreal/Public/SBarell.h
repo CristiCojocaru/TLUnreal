@@ -27,6 +27,8 @@ protected:
 	UPROPERTY(VisibleAnywhere)
 	URadialForceComponent* RadialForceComp;
 
+	bool bCanExplode{ true };
+
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
